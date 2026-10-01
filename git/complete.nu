@@ -15,8 +15,8 @@ export def cmpl-git-log-all [] {
     | { completions: $in, options: { sort: false, match_description: true } }
 }
 
-export def cmpl-git-branch-files [context: string, offset:int] {
-    let token = $context | split row ' '
+export def cmpl-git-branch-files [buffer: string] {
+    let token = $buffer | split row ' '
     let branch = $token | get 1
     let files = $token | skip 2
     git ls-tree -r --name-only $branch
