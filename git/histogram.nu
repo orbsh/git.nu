@@ -10,7 +10,7 @@ def 'frequency' [-w: int] {
 def 'histogram-column' [column --len(-l):int = 50] {
     let o = $in
     let total = $o | get $column | math sum
-    let max = $o | get $column | math max | ($in / $total)
+    let max = $o | get $column | math max | $in / $total
     $o
     | each {|x|
         let c = $x | get $column | $in / $total

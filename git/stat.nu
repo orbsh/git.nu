@@ -52,7 +52,7 @@ export def _git_status [] {
             '#' => {
                 match ($r.1 | str substring 7..) {
                     'oid' => {
-                        $status.commit_hash = ($r.2 | str substring 0..<8)
+                        $status.commit_hash = $r.2 | str substring 0..<8
                     }
                     'head' => {
                         $status.branch = $r.2
@@ -61,8 +61,8 @@ export def _git_status [] {
                         $status.remote = $r.2
                     }
                     'ab' => {
-                        $status.ahead = ($r.2 | into int)
-                        $status.behind = ($r.3 | into int | math abs)
+                        $status.ahead = $r.2 | into int
+                        $status.behind = $r.3 | into int | math abs
                     }
                 }
             }

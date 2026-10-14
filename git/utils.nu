@@ -30,6 +30,75 @@ export def git-changes [] {
     do -i { git --no-optional-locks status --porcelain=1 | lines }
 }
 
+# Status overview of a batch of repos: uncommitted change count + ahead/behind vs upstream.
+# Directory args are variadic (default: current dir); dirs that are not repos are listed too, with state=not-a-repo.
+# ahead/behind are relative to the last fetch; add --fetch (network, one per repo) for accurate numbers.
+export def git-repos-status [
+    ...dirs:path
+    --fetch (-f)   # fetch once per repo first
+    --nested (-n)  # when a dir is not itself a repo, look one level down for its child dirs
+] {
+    let roots = if ($dirs | is-empty) { [$env.PWD] } else { $dirs }
+    mut out = []
+    for p in ($roots | each {|d| $d | path expand }) {
+        let is_dir = ((do -i { $p | path type }) | default '') == 'dir'
+        if not $is_dir {
+            $out = $out | append { path: $p branch: null dirty: null ahead: null behind: null state: 'not-a-repo' }
+            continue
+        }
+        cd $p
+        if (git-is-repo) {
+            $out = $out | append (git-repo-status-row $p $fetch)
+            continue
+        }
+        if not $nested {
+            $out = $out | append { path: $p branch: null dirty: null ahead: null behind: null state: 'not-a-repo' }
+            continue
+        }
+        for c in (ls --all $p | where type == dir | get name) {
+            let n = $c | path basename
+            if ($n | str starts-with '.') or ($n in ['target' 'node_modules']) { continue }
+            cd $c
+            if (git-is-repo) {
+                $out = $out | append (git-repo-status-row $c $fetch)
+            }
+        }
+    }
+    $out
+}
+
+# One row per repo (row factory for git-repos-status; parsing reuses _git_status from stat.nu)
+def git-repo-status-row [p: path, do_fetch: bool] {
+    cd $p
+    let has_remote = do -i { git remote } | default [] | is-not-empty
+    let fetch_code = if $do_fetch and $has_remote {
+        (git fetch origin --quiet | complete).exit_code
+    } else {
+        0
+    }
+    let s = _git_status
+    let upstream = $s.remote
+    let commit = $s.commit_hash? | default ''
+    {
+        path:   $p
+        branch: $s.branch
+        dirty:  ([
+            $s.idx_added_staged $s.idx_modified_staged $s.idx_deleted_staged
+            $s.idx_renamed $s.idx_type_changed
+            $s.wt_modified $s.wt_deleted $s.wt_renamed $s.wt_type_changed
+            $s.wt_untracked $s.conflicts
+        ] | math sum)
+        ahead:  (if ($upstream | is-empty) { null } else { $s.ahead })
+        behind: (if ($upstream | is-empty) { null } else { $s.behind })
+        state:  (if ($commit | str starts-with '(') { 'no-commits' }
+            else if ($s.branch == '(detached)') { 'detached' }
+            else if (not $has_remote) { 'no-remote' }
+            else if ($upstream | is-empty) { 'no-upstream' }
+            else if ($fetch_code != 0) { 'fetch-failed' }
+            else { '' })
+    }
+}
+
 export def git-last-commit [] {
     let d = git log -n 9 --pretty=»»¦««%h»¦«%s»¦«%b
     | split row '»»¦««' | slice 1..
