@@ -1,16 +1,18 @@
 use stat.nu *
 
 export def cmpl-git-log [] {
-    git log -n 32 --pretty=%h»¦«%s
+    let s = $"»(random chars -l 6)«"
+    git log -n 32 --pretty=$"%h($s)%s"
     | lines
-    | split column "»¦«" value description
+    | split column $s value description
     | { completions: $in, options: { sort: false, match_description: true } }
 }
 
 export def cmpl-git-log-all [] {
-    git log --all -n 32 --pretty=%h»¦«%d»¦«%s
+    let s = $"»(random chars -l 6)«"
+    git log --all -n 32 --pretty=$"%h($s)%d($s)%s"
     | lines
-    | split column "»¦«" value branch description
+    | split column $s value branch description
     | each {|x| $x | update description $"($x.branch) ($x.description)" }
     | { completions: $in, options: { sort: false, match_description: true } }
 }
